@@ -16,9 +16,7 @@ const byte pulsePin = 11; // if you change this you need to change the ISR code 
 const byte directionPin = 10;
 int val = 0; // reading of if tube is
 int inpin = 8;
-int clamp = 4;
 int tubein = 0;  // if the tube is in =1, if not in =0
-int end_stop = 4720;  // 1000 = 5mm or 0.1mm = 20
 unsigned long lastLoopTime = 0;
 // the system has three modes: 
     // it can be stopped (0). It can go forwards (1). It can go backwards (-1).
@@ -49,16 +47,15 @@ unsigned char futureTCCR1B = bit(WGM12) | bit(CS10);
 long sleep = 0;
 long start_time = 0;
 int dispense_ammount = 1000;
-int backlash = 1000;
+int backlash = 500;
 
 
 void setup() {
-  //Serial.begin(9600); //115200 or 9600
+  Serial.begin(9600); //115200 or 9600
   pinMode(pulsePin, OUTPUT);   
   pinMode(directionPin, OUTPUT);
   pinMode(permissionPin, OUTPUT);
   pinMode(inpin, INPUT_PULLUP);
-  pinMode(clamp, OUTPUT);
   // the register documentation can be found at: http://www.atmel.com/Images/doc8161.pdf
   // look on page 134 for the section that describes the registers
   // note that registers TCCR1A and TCCR1B both contain setting bits for the same timer
@@ -69,23 +66,13 @@ void setup() {
   // interrupt on match with register OCR1A 
   TIMSK1 = bit (OCIE1A);              
   pinMode(13, OUTPUT);
-  // targetPosition = 400; commandTopSpeed = 500; // move forward so moving to backstop is consistant
-  // do{
-  //     updateSpeed();
-  // }while (mode != 0);
-  // targetPosition = -99999; commandTopSpeed = 500; // move back to backstop
-  // do{
-  //     updateSpeed();
-  // }while (mode != 0);
-  // Serial.println("Setup");
-  // digitalWrite(permissionPin, HIGH);
 }  
 
 
 void loop() { 
   digitalWrite(permissionPin, HIGH);
-  digitalWrite(clamp, LOW);
   val = digitalRead(inpin);
+  //Serial.println(val);
   if (millis() < lastLoopTime + 2000){     // I want to make a delay at the end of loop, but "delay(1000)" kept failing. No delay between loop causes repeated chamfer.
     delay(1);
   }
@@ -103,27 +90,31 @@ void loop() {
     if (val == HIGH) {           // check tube is still in, then run chamfer code.
       Serial.println("start cycle");
       chamferTube();
+      Serial.println("finished cycle");
       lastLoopTime = millis();
-      Serial.println("program loop");
+      //Serial.println("program loop");
     }
   }
 }
 
 
 void chamferTube(){
-  currentPosition = currentPosition - dispense_ammount
+  currentPosition = currentPosition - dispense_ammount;
   commandTopSpeed = 1000; targetPosition = backlash; // move 1000 = move 5mm.
-  do{                                                    // fast move in
+  do{                                                    // move in
     updateSpeed();
   }while (mode != 0);
   digitalWrite(permissionPin, HIGH);
-  custom_delay(15);  // reduces rate it gets stuck. Ideally transition would be smooth
+  delay(1);
+  Serial.println(currentPosition);
   commandTopSpeed = 1000; targetPosition = 0;
   do{                                                        // move back
     updateSpeed();
   }while (mode != 0);
+  Serial.println(currentPosition);
   digitalWrite(permissionPin, HIGH);
-  digitalWrite(clamp, LOW);
+  //delay(2000);
+  //Serial.println("end");
 }
 
 
@@ -139,9 +130,9 @@ void updateSpeed() {
   if (abs(distanceToGo) < 5){  // gives small window of locations to prevent hunting behaviour
     speed = 0;
   }
-  else if (targetPosition == 0){  // experiment to try and fix problem where system hunts after reach end (thus target position 0)
-    speed = 0;
-  }
+  //else if (targetPosition == 0){  // experiment to try and fix problem where system hunts after reach end (thus target position 0)
+  //  speed = 0;
+  //}
   // check if I an near enough to the destination to need to decelerate
   else if ((distanceToGo < 0) && (speed < -sqrt(-decelerationConstant * distanceToGo))){
     speed = -max(min_speed, sqrt(-decelerationConstant * distanceToGo)); 
@@ -173,19 +164,8 @@ void updateSpeed() {
   else if (speed < 0){
     digitalWrite(permissionPin, LOW);
     potentialOCRA = (clockSpeed/(-speed))-1;
-    //if (!digitalRead(backStopPin)){
-    //    Serial.print("hit backstop @:");
-    //    Serial.print("\t");    
-    //    Serial.println(currentPosition);
-    //    emergencyStop();
-    //    currentPosition = 0;
-    //    targetPosition = 0;
-    //    speed = 0;
-    //}
-    //else{
     digitalWrite(directionPin, LOW);
     mode = -1;
-    }
   }
   else{
     // speed is therefore 0
@@ -242,14 +222,6 @@ void updateSpeed() {
   // The "speed" variable being an integer imposes a minimum speed of 1 count per second
 }
 
-
-void emergencyStop(){
-  // I need to temporarily disable interrupts
-  cli();
-  mode = 0;
-  targetPosition = currentPosition;
-  sei();
-}
 
 
 void custom_delay(long sleep){
