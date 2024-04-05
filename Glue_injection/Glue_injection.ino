@@ -174,7 +174,7 @@ void updateSpeed() {
     digitalWrite(directionPin, HIGH);
     digitalWrite(permissionPin, HIGH);
     // I also make the timer count quickly
-    potentialOCRA = 10;
+    potentialOCRA = 100;
   }
   if (potentialOCRA > maxOCRA * 256){
     // use a pre-scalar  of 1024
