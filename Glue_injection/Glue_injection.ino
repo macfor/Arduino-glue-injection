@@ -1,7 +1,8 @@
 /*
 Overview:
-System waits for a tube to be put in; then it grabs it and puts it into the cutter and then takes it out.
-Modified version of Davids linear motor code for flow setting. Intergrated with Michaels code for tube chamfer.
+For nasal birdle project, for glueing the inserter handle in, we need to apply a fixed ammount of glue.
+When button pressed, it delivers a dose of glue. This dose is settable.
+Modified version of tube chamfer code, which in turn was a modification of Davids linear motor code for flow setting.
 
 Linear motor:
 The arduino uses a hardware timer (timer 1) that counts upwards.
@@ -11,7 +12,6 @@ The position counter therefore counts twice as fast as the pulses sent to the mo
 */
 
 const byte permissionPin = 13;
-const byte backStopPin = A5; // resets position and stops
 const byte pulsePin = 11; // if you change this you need to change the ISR code manually
 const byte directionPin = 10;
 int val = 0; // reading of if tube is
@@ -51,34 +51,32 @@ long start_time = 0;
 
 
 void setup() {
-    //Serial.begin(9600); //115200 or 9600
-    pinMode(pulsePin, OUTPUT);   
-    pinMode(directionPin, OUTPUT);
-    pinMode(permissionPin, OUTPUT);
-    // the backstop microswitches connect to ground
-    pinMode(backStopPin, INPUT_PULLUP);
-    pinMode(inpin, INPUT_PULLUP);
-    pinMode(clamp, OUTPUT);
-    // the register documentation can be found at: http://www.atmel.com/Images/doc8161.pdf
-    // look on page 134 for the section that describes the registers
-    // note that registers TCCR1A and TCCR1B both contain setting bits for the same timer
-    // I use timer 1
-    TCCR1A = 0;          
-    // use a pre-scalar  of 1 and clear the timer counter on matching the OCR1A register
-    TCCR1B = bit(WGM12) | bit(CS10);    
-    // interrupt on match with register OCR1A 
-    TIMSK1 = bit (OCIE1A);              
-    pinMode(13, OUTPUT);
-   // targetPosition = 400; commandTopSpeed = 500; // move forward so moving to backstop is consistant
-   // do{
-   //     updateSpeed();
-   // }while (mode != 0);
-   // targetPosition = -99999; commandTopSpeed = 500; // move back to backstop
-   // do{
-   //     updateSpeed();
-   // }while (mode != 0);
-   // Serial.println("Setup");
-   // digitalWrite(permissionPin, HIGH);
+  //Serial.begin(9600); //115200 or 9600
+  pinMode(pulsePin, OUTPUT);   
+  pinMode(directionPin, OUTPUT);
+  pinMode(permissionPin, OUTPUT);
+  pinMode(inpin, INPUT_PULLUP);
+  pinMode(clamp, OUTPUT);
+  // the register documentation can be found at: http://www.atmel.com/Images/doc8161.pdf
+  // look on page 134 for the section that describes the registers
+  // note that registers TCCR1A and TCCR1B both contain setting bits for the same timer
+  // I use timer 1
+  TCCR1A = 0;          
+  // use a pre-scalar  of 1 and clear the timer counter on matching the OCR1A register
+  TCCR1B = bit(WGM12) | bit(CS10);    
+  // interrupt on match with register OCR1A 
+  TIMSK1 = bit (OCIE1A);              
+  pinMode(13, OUTPUT);
+  // targetPosition = 400; commandTopSpeed = 500; // move forward so moving to backstop is consistant
+  // do{
+  //     updateSpeed();
+  // }while (mode != 0);
+  // targetPosition = -99999; commandTopSpeed = 500; // move back to backstop
+  // do{
+  //     updateSpeed();
+  // }while (mode != 0);
+  // Serial.println("Setup");
+  // digitalWrite(permissionPin, HIGH);
 }  
 
 
@@ -114,23 +112,23 @@ void chamferTube(){
   digitalWrite(clamp, HIGH);                              // clamp tube and move end stop out of way
   commandTopSpeed = 10000; targetPosition = end_stop-500; // move 1000 = move 5mm.
   do{                                                    // fast move in
-      updateSpeed();
+    updateSpeed();
   }while (mode != 0);
   digitalWrite(permissionPin, HIGH);
   custom_delay(15);  // reduces rate it gets stuck. Ideally transition would be smooth
   commandTopSpeed = 400; targetPosition = end_stop;
   do{                                                      // slow final move in (while cutting)
-      updateSpeed();
+    updateSpeed();
   }while (mode != 0);
   digitalWrite(permissionPin, HIGH);
   custom_delay(100);
   commandTopSpeed = 10000; targetPosition = 600;
   do{                                                        // quick move out
-      updateSpeed();
+    updateSpeed();
   }while (mode != 0);
   commandTopSpeed = 1000; targetPosition = -10000;
   do{                                                         // slow move to end.
-      updateSpeed();
+    updateSpeed();
   }while (mode != 0);
   digitalWrite(permissionPin, HIGH);
   digitalWrite(clamp, LOW);
@@ -161,88 +159,88 @@ void updateSpeed() {
   }
   // check if I need to snap to the commandTopSpeed
   else if (abs(speed-commandTopSpeed)<accelerationConstant){
-      speed = commandTopSpeed;
+    speed = commandTopSpeed;
   }
   // check if I need to be accelerating forwards
   else if (speed<commandTopSpeed){
-      speed += accelerationConstant;
-      speed = max(speed, min_speed);
+    speed += accelerationConstant;
+    speed = max(speed, min_speed);
   }
   // check if I need to be accelerating backwards
   else if (speed>commandTopSpeed){
-      speed -= accelerationConstant;
-      speed = min(speed, min_speed);
+    speed -= accelerationConstant;
+    speed = min(speed, min_speed);
   }
   // speed is now set
   if (speed > 0){
-      digitalWrite(permissionPin, LOW);
-      potentialOCRA = (clockSpeed/speed)-1;
-      digitalWrite(directionPin, HIGH);
-      mode = 1;
+    digitalWrite(permissionPin, LOW);
+    potentialOCRA = (clockSpeed/speed)-1;
+    digitalWrite(directionPin, HIGH);
+    mode = 1;
   }    
   else if (speed < 0){
-      digitalWrite(permissionPin, LOW);
-      potentialOCRA = (clockSpeed/(-speed))-1;
-      if (!digitalRead(backStopPin)){
-          Serial.print("hit backstop @:");
-          Serial.print("\t");    
-          Serial.println(currentPosition);
-          emergencyStop();
-          currentPosition = 0;
-          targetPosition = 0;
-          speed = 0;
-      }
-      else{
-          digitalWrite(directionPin, LOW);
-          mode = -1;
-      }
+    digitalWrite(permissionPin, LOW);
+    potentialOCRA = (clockSpeed/(-speed))-1;
+    //if (!digitalRead(backStopPin)){
+    //    Serial.print("hit backstop @:");
+    //    Serial.print("\t");    
+    //    Serial.println(currentPosition);
+    //    emergencyStop();
+    //    currentPosition = 0;
+    //    targetPosition = 0;
+    //    speed = 0;
+    //}
+    //else{
+    digitalWrite(directionPin, LOW);
+    mode = -1;
+    }
   }
   else{
-      // speed is therefore 0
-      mode = 0;
-      // for the sake of removing ambiguity and history dependence I set the directionPin
-      digitalWrite(directionPin, HIGH);
-      digitalWrite(permissionPin, HIGH);
-      // I also make the timer count quickly
-      potentialOCRA = 10;
+    // speed is therefore 0
+    mode = 0;
+    // for the sake of removing ambiguity and history dependence I set the directionPin
+    digitalWrite(directionPin, HIGH);
+    digitalWrite(permissionPin, HIGH);
+    // I also make the timer count quickly
+    potentialOCRA = 10;
   }
   if (potentialOCRA > maxOCRA * 256){
-      // use a pre-scalar  of 1024
-      potentialOCRA /= 1024;
-      // if potentialOCRA will not fit in 16 bits use maxOCRA instead
-      futureOCR1A = (potentialOCRA < maxOCRA) ? potentialOCRA : maxOCRA;
-      futureTCCR1B = bit(WGM12) | bit(CS12) | bit(CS10);
-      Serial.println("This should never be executed.");
-      Serial.println("PotentialOCRA should never get high enough");
-      Serial.println(currentPosition);
+    // use a pre-scalar  of 1024
+    potentialOCRA /= 1024;
+    // if potentialOCRA will not fit in 16 bits use maxOCRA instead
+    futureOCR1A = (potentialOCRA < maxOCRA) ? potentialOCRA : maxOCRA;
+    futureTCCR1B = bit(WGM12) | bit(CS12) | bit(CS10);
+    Serial.println("This should never be executed.");
+    Serial.println("PotentialOCRA should never get high enough");
+    Serial.println(currentPosition);
   }
   else if(potentialOCRA > maxOCRA * 64){
-      // use a pre-scaler  of 256  
-      futureOCR1A = potentialOCRA/256;
-      futureTCCR1B = bit(WGM12) | bit(CS12);
-      //Serial.println("256");
-      //Serial.println(currentPosition);
+    // use a pre-scaler  of 256  
+    futureOCR1A = potentialOCRA/256;
+    futureTCCR1B = bit(WGM12) | bit(CS12);
+    //Serial.println("256");
+    //Serial.println(currentPosition);
   }
   else if(potentialOCRA > maxOCRA * 8){
-      // use a pre-scaler  of 64  
-      futureOCR1A = potentialOCRA/64;
-      futureTCCR1B = bit(WGM12) | bit(CS11) | bit(CS10);
-      //Serial.println("64");
-      //Serial.println(currentPosition);
+    // use a pre-scaler  of 64  
+    futureOCR1A = potentialOCRA/64;
+    futureTCCR1B = bit(WGM12) | bit(CS11) | bit(CS10);
+    //Serial.println("64");
+    //Serial.println(currentPosition);
   }
   else if(potentialOCRA > maxOCRA * 1){
-      // use a pre-scalar  of 8
-      futureOCR1A = potentialOCRA/8;
-      futureTCCR1B = bit(WGM12) | bit(CS11);
-      //Serial.println("8");
-      //Serial.println(currentPosition);
+    // use a pre-scalar  of 8
+    futureOCR1A = potentialOCRA/8;
+    futureTCCR1B = bit(WGM12) | bit(CS11);
+    //Serial.println("8");
+    //Serial.println(currentPosition);
   }
   else{
-      // use a pre-scalar  of 1
-      futureOCR1A = potentialOCRA;
-      futureTCCR1B = bit(WGM12) | bit(CS10);
-      //Serial.println("1");
-      //Serial.println(currentPosition);
+    // use a pre-scalar  of 1
+    futureOCR1A = potentialOCRA;
+    futureTCCR1B = bit(WGM12) | bit(CS10);
+    //Serial.println("1");
+    //Serial.println(currentPosition);
   }
   // the interrupts per second is = clockSpeed / (prescaler*(OCR1A + 1))
   // for an OCR1A value of 3 there will be 4 clock ticks per repeat. (012301230123)  
@@ -280,8 +278,8 @@ void custom_delay(long sleep){
 ISR(TIMER1_COMPA_vect){
   // this is the interrupt service routine
   if (mode){
-      PORTB ^= 8;  // flips output bit 2  
-      currentPosition += mode; // increment or decrement the motor position as appropriate
+    PORTB ^= 8;  // flips output bit 2  
+    currentPosition += mode; // increment or decrement the motor position as appropriate
   }
   TCCR1B = futureTCCR1B;
   OCR1A = futureOCR1A;
