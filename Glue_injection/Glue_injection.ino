@@ -48,6 +48,8 @@ unsigned char futureTCCR1B = bit(WGM12) | bit(CS10);
 // used for a custom version of delay as normal delay is problematic
 long sleep = 0;
 long start_time = 0;
+int dispense_ammount = 1000;
+int backlash = 1000;
 
 
 void setup() {
@@ -109,25 +111,15 @@ void loop() {
 
 
 void chamferTube(){
-  digitalWrite(clamp, HIGH);                              // clamp tube and move end stop out of way
-  commandTopSpeed = 10000; targetPosition = end_stop-500; // move 1000 = move 5mm.
+  currentPosition = currentPosition - dispense_ammount
+  commandTopSpeed = 1000; targetPosition = backlash; // move 1000 = move 5mm.
   do{                                                    // fast move in
     updateSpeed();
   }while (mode != 0);
   digitalWrite(permissionPin, HIGH);
   custom_delay(15);  // reduces rate it gets stuck. Ideally transition would be smooth
-  commandTopSpeed = 400; targetPosition = end_stop;
-  do{                                                      // slow final move in (while cutting)
-    updateSpeed();
-  }while (mode != 0);
-  digitalWrite(permissionPin, HIGH);
-  custom_delay(100);
-  commandTopSpeed = 10000; targetPosition = 600;
-  do{                                                        // quick move out
-    updateSpeed();
-  }while (mode != 0);
-  commandTopSpeed = 1000; targetPosition = -10000;
-  do{                                                         // slow move to end.
+  commandTopSpeed = 1000; targetPosition = 0;
+  do{                                                        // move back
     updateSpeed();
   }while (mode != 0);
   digitalWrite(permissionPin, HIGH);
